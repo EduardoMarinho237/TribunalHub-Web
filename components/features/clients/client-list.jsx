@@ -1,22 +1,19 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { toast } from 'react-hot-toast'
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-  DropdownMenuSeparator,
-  DropdownMenuCheckboxItem
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
-import { Check, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, Eye, Pencil, User, FileText, Calendar, Phone, Mail, ChevronDown } from "lucide-react"
+import { Check, MoreVertical, ArrowUp, ArrowDown, Eye, Pencil, User, FileText, Calendar, Phone, Mail, ChevronDown } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -34,65 +31,100 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 
-// Gerar 20 clientes mockados com mais campos
-const generateMockClients = () => {
-  const statuses = ["Ativo", "Inativo", "Pendente"]
-  const names = [
-    "João Silva", "Maria Souza", "Carlos Oliveira", "Ana Santos", "Pedro Costa",
-    "Fernanda Lima", "Ricardo Alves", "Patrícia Nunes", "Gabriel Martins", "Juliana Castro",
-    "Roberto Fernandes", "Amanda Rocha", "Lucas Mendes", "Beatriz Carvalho", "Felipe Ramos",
-    "Camila Dias", "Rodrigo Gonçalves", "Tatiana Ribeiro", "Marcos Pereira", "Isabela Almeida"
-  ]
-  
-  const clients = []
-  for (let i = 1; i <= 20; i++) {
-    const name = names[i - 1]
-    const email = name.toLowerCase().replace(' ', '.') + "@exemplo.com"
-    const phone = `(${Math.floor(10 + Math.random() * 90)}) 9${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`
-    const status = statuses[Math.floor(Math.random() * statuses.length)]
-    const registrationDate = new Date(Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000))
-    const caseCount = Math.floor(Math.random() * 15)
-    
-    clients.push({
-      id: i,
-      name,
-      email,
-      phone,
-      status,
-      registrationDate,
-      caseCount,
-      notes: i % 3 === 0 ? "Cliente importante com vários casos em andamento" : ""
-    })
-  }
-  return clients
-}
-
-const clients = generateMockClients()
-
-const ClientList = () => {
+export default function ClientList() {
   const router = useRouter()
+  const [clients, setClients] = useState([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ 
-    key: "name", 
+    key: "nome", 
     direction: 'ascending' 
   })
-  const [clientsPerPage, setClientsPerPage] = useState(8) // Variável para controlar quantos aparecem por página
+  const [clientsPerPage, setClientsPerPage] = useState(8)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isMonitoringEnabled, setIsMonitoringEnabled] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
   const [clientToDelete, setClientToDelete] = useState(null)
 
+  useEffect(() => {
+    const checkAuthAndLoadClients = async () => {
+      const token = localStorage.getItem('auth_token')
+      const userData = localStorage.getItem('user_data')
+      
+      if (!token || !userData) {
+        router.push('/login')
+        return
+      }
+      
+      await loadClients()
+    }
+    
+    checkAuthAndLoadClients()
+  }, [router])
+
+  const loadClients = async () => {
+    try {
+      setLoading(true)
+      
+      const token = localStorage.getItem('auth_token')
+
+      const response = await fetch(`http://localhost:8080/api/clientes`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      
+      const formattedClients = data.map(client => ({
+        id: client.id,
+        name: client.nome,
+        email: client.email,
+        phone: client.telefone,
+        registrationDate: new Date(client.dataCriacao),
+        status: 'Ativo',
+        caseCount: 0,
+        notes: ''
+      }))
+
+      setClients(formattedClients)
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('Erro ao carregar lista de clientes')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleDelete = async (clientId) => {
     try {
-      // Substitua por sua chamada à API
-      // await fetch(`/api/clients/${clientId}`, { method: 'DELETE' })
-      console.log(`Cliente ${clientId} excluído`)
-      // Atualize a lista de clientes após exclusão
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`http://localhost:8080/api/clientes/${clientId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      toast.success('Cliente removido com sucesso!')
+      loadClients()
     } catch (error) {
       console.error("Erro ao excluir cliente:", error)
+      toast.error('Erro ao remover cliente')
     } finally {
       setIsDeleteDialogOpen(false)
     }
@@ -122,7 +154,6 @@ const ClientList = () => {
     
     if (sortConfig.key) {
       result.sort((a, b) => {
-        // Tratar diferentes tipos de ordenação
         if (sortConfig.key === 'registrationDate') {
           const dateA = new Date(a.registrationDate).getTime()
           const dateB = new Date(b.registrationDate).getTime()
@@ -135,7 +166,6 @@ const ClientList = () => {
             : b.caseCount - a.caseCount
         }
         
-        // Ordenação padrão para strings
         if (a[sortConfig.key] < b[sortConfig.key]) {
           return sortConfig.direction === 'ascending' ? -1 : 1
         }
@@ -147,18 +177,12 @@ const ClientList = () => {
     }
     
     return result
-  }, [searchTerm, sortConfig])
+  }, [clients, searchTerm, sortConfig])
 
   const indexOfLastClient = currentPage * clientsPerPage
   const indexOfFirstClient = indexOfLastClient - clientsPerPage
   const currentClients = filteredClients.slice(indexOfFirstClient, indexOfLastClient)
   const totalPages = Math.ceil(filteredClients.length / clientsPerPage)
-
-  const casosMock = [
-    { id: 1, name: "Caso Trabalhista - Empresa X" },
-    { id: 2, name: "Processo Criminal - Acusação Y" },
-    { id: 3, name: "Ação Civil - Indenização Z" }
-  ];
 
   const getSortLabel = () => {
     switch(sortConfig.key) {
@@ -237,11 +261,37 @@ const ClientList = () => {
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <Button onClick={() => router.push('/clientes/add')} className="ml-auto">Adicionar Cliente</Button>
+          <Button onClick={() => router.push('/clientes/adicionar')} className="ml-auto">Adicionar Cliente</Button>
         </div>
       </div>
 
-      {filteredClients.length > 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+          {Array.from({ length: clientsPerPage }).map((_, index) => (
+            <div key={index} className="border rounded-lg p-4 bg-white shadow-sm">
+              <div className="flex justify-between items-start">
+                <div className="w-full">
+                  <Skeleton className="h-6 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-full mb-1" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+              </div>
+              <div className="flex justify-between items-center mt-4 pt-3 border-t">
+                <div className="flex gap-2 w-full">
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredClients.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
           {currentClients.map((client) => (
             <div key={client.id} className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
@@ -297,7 +347,7 @@ const ClientList = () => {
                   <Button 
                     variant="outline" 
                     size="icon" 
-                    onClick={() => router.push(`/clientes/${client.id}/edit`)}
+                    onClick={() => router.push(`/clientes/editar/${client.id}`)}
                     className="h-8 w-8"
                   >
                     <Pencil size={16} />
@@ -310,64 +360,9 @@ const ClientList = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => router.push('/clientes/1/casos/add')}>
+                      <DropdownMenuItem onClick={() => router.push('/clientes/1/casos/adicionar')}>
                         Adicionar caso
                       </DropdownMenuItem>
-
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="flex items-center justify-between">
-                          Gerenciar casos
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          {/* Opção Editar Caso */}
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Editar caso</DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              {casosMock.map((caso) => (
-                                <DropdownMenuItem 
-                                  key={`edit-${caso.id}`}
-                                  onClick={() => router.push(`/clientes/1/casos/editar?casoId=${caso.id}`)}
-                                >
-                                  {caso.name}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
-
-                          {/* Opção Gerar Link de Formulário */}
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Gerar link de formulário</DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              {casosMock.map((caso) => (
-                                <DropdownMenuItem 
-                                  key={`link-${caso.id}`}
-                                  onClick={() => router.push(`/clientes/1/casos/gerarlink?casoId=${caso.id}`)}
-                                >
-                                  {caso.name}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      
-                      <DropdownMenuItem 
-                        className="flex justify-between items-center"
-                        onSelect={(e) => e.preventDefault()}
-                        onClick={() => setIsMonitoringEnabled(!isMonitoringEnabled)}
-                      >
-                        <span className="flex items-center gap-2">
-                          Disponibilizar acompanhamento
-                        </span>
-                        <div className={`w-4 h-4 border rounded-sm flex items-center justify-center 
-                          ${isMonitoringEnabled ? 'bg-primary border-primary' : 'border-gray-300'}`}
-                        >
-                          {isMonitoringEnabled && (
-                            <Check className="h-3 w-3 text-white" />
-                          )}
-                        </div>
-                      </DropdownMenuItem> 
-
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => {
@@ -394,11 +389,11 @@ const ClientList = () => {
           <p className="text-sm text-gray-500 mb-4 text-center">
             {searchTerm ? `Nenhum resultado para "${searchTerm}"` : "Adicione seu primeiro cliente"}
           </p>
-          <Button onClick={() => router.push('/clientes/add')}>Adicionar Cliente</Button>
+          <Button onClick={() => router.push('/clientes/adicionar')}>Adicionar Cliente</Button>
         </div>
       )}
 
-      {filteredClients.length > 0 && (
+      {filteredClients.length > 0 && !loading && (
         <div className="mt-auto">
           <Pagination>
             <PaginationContent>
@@ -411,7 +406,6 @@ const ClientList = () => {
               </PaginationItem>
               
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                // Calcular página baseada na posição atual
                 let pageNum
                 if (currentPage <= 3) {
                   pageNum = i + 1
@@ -485,7 +479,6 @@ const ClientList = () => {
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-            {/* Seção de Informações Básicas */}
             <div className="space-y-4">
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Nome Completo</div>
@@ -509,7 +502,6 @@ const ClientList = () => {
               </div>
             </div>
 
-            {/* Seção de Informações Adicionais */}
             <div className="space-y-4">
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Data de Cadastro</div>
@@ -554,7 +546,7 @@ const ClientList = () => {
               variant="secondary"
               onClick={() => {
                 setIsViewModalOpen(false)
-                router.push(`/clientes/${selectedUser?.id}/edit`)
+                router.push(`/clientes/editar`)
               }}
             >
               Editar informações
@@ -565,5 +557,3 @@ const ClientList = () => {
     </div>
   )
 }
-
-export default ClientList

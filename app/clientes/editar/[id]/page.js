@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft } from "lucide-react"
 import { Loader2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
+import { toast } from "react-hot-toast"
 
 export default function EditClientPage() {
   const router = useRouter()
@@ -30,36 +31,47 @@ export default function EditClientPage() {
     const fetchClient = async () => {
       try {
         setIsLoading(true)
-        // Substitua por sua chamada à API real
-        // const response = await fetch(`/api/clients/${clientId}`)
-        // const data = await response.json()
         
-        // Dados mockados para exemplo
-        const mockClient = {
-          id: clientId,
-          name: "João Silva",
-          email: "joao@exemplo.com",
-          phone: "(11) 99999-9999",
-          notes: "Cliente desde 2020\nPreferência por contato por email",
-          status: "Ativo"
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          router.push('/login')
+          return
         }
+
+        const response = await fetch(`http://localhost:8080/api/clientes/${clientId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error(`Erro ao carregar cliente: ${response.status}`)
+        }
+
+        const clientData = await response.json()
         
         setFormData({
-          name: mockClient.name,
-          email: mockClient.email,
-          phone: mockClient.phone,
-          notes: mockClient.notes,
-          status: mockClient.status
+          name: clientData.nome || "",
+          email: clientData.email || "",
+          phone: clientData.telefone || "",
+          notes: "", // A API não retorna notes, então deixamos vazio
+          status: "Ativo" // Definimos como padrão, já que a API não retorna status
         })
       } catch (error) {
+        console.error("Erro ao carregar cliente:", error)
         setError("Não foi possível carregar os dados do cliente")
+        toast.error('Erro ao carregar dados do cliente')
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchClient()
-  }, [clientId])
+    if (clientId) {
+      fetchClient()
+    }
+  }, [clientId, router])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -75,22 +87,42 @@ export default function EditClientPage() {
     setError("")
     
     try {
-      // Substitua por sua chamada à API real
-      // const response = await fetch(`/api/clients/${clientId}`, {
-      //   method: 'PUT',
-      //   body: JSON.stringify(formData),
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      // })
-      
-      // Simulando delay da API
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        router.push('/login')
+        return
+      }
+
+      // Preparar dados no formato esperado pela API
+      const requestData = {
+        nome: formData.name,
+        email: formData.email,
+        telefone: formData.phone
+        // A API não suporta notes e status no momento
+      }
+
+      const response = await fetch(`http://localhost:8080/api/clientes/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status} ao atualizar cliente`)
+      }
+
+      toast.success('Cliente atualizado com sucesso!')
       
       // Redireciona após salvar
       router.push('/')
     } catch (error) {
-      setError("Não foi possível atualizar o cliente")
+      console.error("Erro ao atualizar cliente:", error)
+      setError(error.message || "Não foi possível atualizar o cliente")
+      toast.error('Erro ao atualizar cliente')
     } finally {
       setIsSaving(false)
     }
@@ -195,6 +227,9 @@ export default function EditClientPage() {
                   placeholder="Informações adicionais sobre o cliente"
                   className="min-h-[120px]"
                 />
+                <p className="text-sm text-muted-foreground">
+                  Nota: As anotações são armazenadas apenas localmente no momento.
+                </p>
               </div>
             </div>
 
@@ -203,7 +238,7 @@ export default function EditClientPage() {
               <Button 
                 type="button"
                 variant="outline"
-                onClick={() => router.push('/')}
+                onClick={() => router.push('/clientes')}
               >
                 Cancelar
               </Button>

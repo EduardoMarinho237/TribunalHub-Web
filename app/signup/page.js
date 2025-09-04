@@ -4,18 +4,44 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
-import { useState } from "react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import Logo from "@/components/logo"
+import Logo from "@/components/common/logo"
 
 export default function RegisterPage() {
   const [nome, setNome] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [passwordConfirm, setPasswordConfirm] = useState("")
+  const [cargo, setCargo] = useState("")
+  const [cargos, setCargos] = useState([])
   const [error, setError] = useState("")
+  const [loadingCargos, setLoadingCargos] = useState(true)
   const router = useRouter()
+
+  useEffect(() => {
+    const fetchCargos = async () => {
+      try {
+        const response = await fetch("http://localhost:8080/api/usuarios/cargos")
+        if (response.ok) {
+          const data = await response.json()
+          // Filter out "DESENVOLVEDOR" from the options
+          const filteredCargos = data.filter(cargo => cargo !== "DESENVOLVEDOR")
+          setCargos(filteredCargos)
+        } else {
+          console.error("Erro ao buscar cargos:", response.statusText)
+        }
+      } catch (error) {
+        console.error("Erro ao buscar cargos:", error)
+      } finally {
+        setLoadingCargos(false)
+      }
+    }
+
+    fetchCargos()
+  }, [])
 
     const handleSubmit = async (e) => {
     e.preventDefault()
@@ -23,6 +49,11 @@ export default function RegisterPage() {
 
     if (password !== passwordConfirm) {
         setError("As senhas não coincidem")
+        return
+    }
+
+    if (!cargo) {
+        setError("Por favor, selecione um cargo")
         return
     }
 
@@ -34,7 +65,7 @@ export default function RegisterPage() {
             nome,
             email,
             senha: password,
-            cargo: "ADVOGADO",
+            cargo,
             contrato: { id: 1 },
             tipoUsuario: "COMUM"
         })
@@ -112,6 +143,21 @@ export default function RegisterPage() {
                   onChange={(e) => setPasswordConfirm(e.target.value)}
                   required
                 />
+              </div>
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="cargo">Cargo</Label>
+                <Select value={cargo} onValueChange={setCargo} required>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={loadingCargos ? "Carregando cargos..." : "Selecione um cargo"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cargos.map((cargoOption) => (
+                      <SelectItem key={cargoOption} value={cargoOption}>
+                        {cargoOption}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               {error && <p className="text-red-500 text-sm">{error}</p>}
             </div>

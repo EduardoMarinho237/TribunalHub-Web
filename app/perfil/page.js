@@ -10,12 +10,12 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ArrowLeft } from "lucide-react"
 import toast, { Toaster } from "react-hot-toast"
-import axios from "axios"
 import { Pencil } from "lucide-react"
 
 export default function ProfilePage() {
   const router = useRouter()
   const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
@@ -27,17 +27,93 @@ export default function ProfilePage() {
   const fileInputRef = useRef(null)
   const [unsavedChanges, setUnsavedChanges] = useState(false)
   const [showExitDialog, setShowExitDialog] = useState(false)
+  const [isLoadingImage, setIsLoadingImage] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("usuarioLogado")
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser)
-      setUser(parsed)
-      setName(parsed.nome)
-      setEmail(parsed.email)
-      if (parsed.fotoUrl) setPreviewImage(`http://localhost:8080${parsed.fotoUrl}`)
+    const loadUserData = async () => {
+      const token = localStorage.getItem("auth_token")
+      const userData = localStorage.getItem("user_data")
+      
+      if (!token || !userData) {
+        router.push("/login")
+        return
+      }
+      
+      try {
+        const parsedUser = JSON.parse(userData)
+        setUser(parsedUser)
+        setName(parsedUser.nome || "")
+        setEmail(parsedUser.email || "")
+        
+        if (parsedUser.userId) {
+          await loadUserPhoto(parsedUser.userId)
+        }
+      } catch (error) {
+        console.error("Erro ao parsear dados do usuário:", error)
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_data')
+        router.push("/login")
+        return
+      }
+      
+      setLoading(false)
     }
-  }, [])
+    
+    loadUserData()
+  }, [router])
+
+  const loadUserPhoto = async (userId) => {
+    try {
+      setIsLoadingImage(true)
+      console.log('Carregando foto para usuário:', userId)
+      
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`http://localhost:8080/api/usuarios/${userId}/foto`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      console.log('Status da resposta GET foto:', response.status)
+      
+      if (response.ok) {
+        const contentType = response.headers.get('content-type')
+        console.log('Content-Type da resposta:', contentType)
+        
+        if (contentType && contentType.startsWith('image/')) {
+          // Se retorna imagem diretamente
+          const photoBlob = await response.blob()
+          const photoUrl = URL.createObjectURL(photoBlob)
+          setPreviewImage(photoUrl)
+        } else {
+          // Se retorna JSON com URL da imagem
+          const data = await response.json()
+          console.log('Dados da foto recebidos:', data)
+          
+          if (data && (data.url || data.fotoUrl || data.path)) {
+            const imageUrl = data.url || data.fotoUrl || data.path
+            setPreviewImage(imageUrl.startsWith('http') ? imageUrl : `http://localhost:8080${imageUrl}`)
+          } else {
+            setPreviewImage(null)
+          }
+        }
+      } else if (response.status === 404) {
+        console.log('Usuário não possui foto')
+        setPreviewImage(null)
+      } else {
+        console.log('Erro ao carregar foto - Status:', response.status)
+        const errorText = await response.text()
+        console.log('Erro:', errorText)
+        setPreviewImage(null)
+      }
+    } catch (error) {
+      console.log('Erro ao carregar foto do usuário:', error)
+      setPreviewImage(null)
+    } finally {
+      setIsLoadingImage(false)
+    }
+  }
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
@@ -51,47 +127,124 @@ export default function ProfilePage() {
   }
 
   const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      const updateData = { nome: name, email }
-      await axios.put(`http://localhost:8080/api/usuarios/${user.id}`, updateData)
-      if (selectedFile) {
-        const formData = new FormData()
-        formData.append("foto", selectedFile)
-        const res = await axios.patch(`http://localhost:8080/api/usuarios/${user.id}/foto`, formData, {
-          headers: { "Content-Type": "multipart/form-data" }
-        })
-        updateData.fotoUrl = res.data.fotoUrl
-      }
-      const updatedUser = { ...user, ...updateData }
-      localStorage.setItem("usuarioLogado", JSON.stringify(updatedUser))
-      setUser(updatedUser)
-      setSelectedFile(null)
-      setUnsavedChanges(false)
-      toast.success("Perfil atualizado com sucesso")
-    } catch (err) {
-      toast.error(err.response?.data || "Erro ao atualizar perfil")
-    } finally {
-      setIsSaving(false)
+    if (!user?.userId) {
+      toast.error("Usuário não autenticado");
+      return;
     }
-  }
-
+  
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      // Atualizar dados básicos
+      const updateResponse = await fetch(`http://localhost:8080/api/usuarios/${user.userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ nome: name, email })
+      });
+      
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.text();
+        throw new Error(`Erro ${updateResponse.status}: ${errorData}`);
+      }
+  
+      // Atualizar foto se existir
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append('foto', selectedFile);
+        
+        const photoResponse = await fetch(`http://localhost:8080/api/usuarios/${user.userId}/foto`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // Não inclua Content-Type quando usar FormData, o browser define automaticamente
+            // com o boundary correto
+          },
+          body: formData
+        });
+        
+        if (!photoResponse.ok) {
+          const errorData = await photoResponse.text();
+          throw new Error(`Erro ao atualizar foto: ${photoResponse.status} - ${errorData}`);
+        }
+  
+        const usuario = await photoResponse.json();
+        if (usuario.fotoUrl) {
+          const fotoUrl = usuario.fotoUrl.startsWith('http') 
+            ? usuario.fotoUrl 
+            : `http://localhost:8080${usuario.fotoUrl}`;
+          setPreviewImage(`${fotoUrl}?t=${new Date().getTime()}`);
+        }
+      }
+      
+      // Atualizar localStorage
+      const updatedUser = { ...user, nome: name, email };
+      localStorage.setItem("user_data", JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      
+      setSelectedFile(null);
+      setUnsavedChanges(false);
+      toast.success("Perfil atualizado com sucesso");
+    } catch (err) {
+      console.error('Erro completo ao atualizar perfil:', err);
+      
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        toast.error("Erro de conexão. Verifique se o servidor está rodando.");
+      } else {
+        toast.error(err.message || "Erro ao atualizar perfil");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
   const handlePasswordChange = async () => {
+    if (!user?.userId) {
+      toast.error("Usuário não autenticado")
+      return
+    }
+
     if (newPassword !== confirmPassword) {
       toast.error("As senhas não conferem")
       return
     }
+    
+    if (!currentPassword || !newPassword) {
+      toast.error("Preencha todos os campos")
+      return
+    }
+    
     try {
-      await axios.patch(`http://localhost:8080/api/usuarios/${user.id}/senha`, {
-        senhaAtual: currentPassword,
-        novaSenha: newPassword
+      const token = localStorage.getItem('auth_token')
+      
+      // PATCH /{id}/senha - Alterar senha do usuário
+      const response = await fetch(`http://localhost:8080/api/usuarios/${user.userId}/senha`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          senhaAtual: currentPassword,
+          novaSenha: newPassword
+        })
       })
+      
+      if (!response.ok) {
+        const errorData = await response.text()
+        throw new Error(`Erro ${response.status}: ${errorData}`)
+      }
+      
       toast.success("Senha alterada com sucesso")
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
     } catch (err) {
-      toast.error(err.response?.data || "Erro ao alterar senha")
+      console.error('Erro ao alterar senha:', err)
+      toast.error(err.message || "Erro ao alterar senha")
     }
   }
 
@@ -106,6 +259,21 @@ export default function ProfilePage() {
   const confirmExit = () => {
     setShowExitDialog(false)
     router.push("/")
+  }
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen bg-gray-50 items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="mt-4 text-gray-600">Carregando...</p>
+      </div>
+    )
+  }
+
+  // Don't render if not authenticated (will redirect in useEffect)
+  if (!user) {
+    return null
   }
 
   return (
@@ -133,8 +301,16 @@ export default function ProfilePage() {
                   onClick={() => fileInputRef.current.click()}
                 >
                   <Avatar className="h-32 w-32">
-                    <AvatarImage src={previewImage || "/default-avatar.png"} />
-                    <AvatarFallback className="text-3xl">{user?.nome?.charAt(0) || "U"}</AvatarFallback>
+                    {isLoadingImage ? (
+                      <div className="flex items-center justify-center h-full w-full bg-gray-200">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      </div>
+                    ) : (
+                      <>
+                        <AvatarImage src={previewImage || "/default-avatar.png"} />
+                        <AvatarFallback className="text-3xl">{user?.nome?.charAt(0) || "U"}</AvatarFallback>
+                      </>
+                    )}
                   </Avatar>
                   <div className="absolute inset-0 bg-black bg-opacity-25 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-full">
                     <span className="text-white text-xl"><Pencil /></span>

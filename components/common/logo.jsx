@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 export default function Logo({ className = "" }) {
   return (
     <div className={`font-cyGrotesk text-3xl select-none ${className}`}>

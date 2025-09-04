@@ -1,6 +1,6 @@
 "use client"
 
-import UserProfileDropdown from "@/app/acompanhamento/components/user-profile-dropdown"
+import UserProfileDropdown from "@/components/common/user-profile-dropdown"
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
