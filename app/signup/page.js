@@ -9,6 +9,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Logo from "@/components/common/logo"
+import { toast } from "react-hot-toast"
 
 export default function RegisterPage() {
   const [nome, setNome] = useState("")
@@ -27,7 +28,6 @@ export default function RegisterPage() {
         const response = await fetch("http://localhost:8080/api/usuarios/cargos")
         if (response.ok) {
           const data = await response.json()
-          // Filter out "DESENVOLVEDOR" from the options
           const filteredCargos = data.filter(cargo => cargo !== "DESENVOLVEDOR")
           setCargos(filteredCargos)
         } else {
@@ -66,16 +66,15 @@ export default function RegisterPage() {
             email,
             senha: password,
             cargo,
-            contrato: { id: 1 },
-            tipoUsuario: "COMUM"
         })
         })
+        const text = await res.text();
+        let data;
 
-        let data
         try {
-        data = await res.json()
+          data = JSON.parse(text);
         } catch {
-        data = await res.text() // se não for JSON, lê como texto
+          data = text;
         }
 
         if (!res.ok) {
@@ -83,9 +82,10 @@ export default function RegisterPage() {
         return
         }
 
+        toast.success("Uusário registrado com sucesso!")
         router.push("/login")
     } catch (err) {
-        setError("Erro ao registrar usuário")
+        setError(data || "Erro ao conectar com o servidor")
     }
     }
 
