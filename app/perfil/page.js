@@ -65,8 +65,6 @@ export default function ProfilePage() {
   const loadUserPhoto = async (userId) => {
     try {
       setIsLoadingImage(true)
-      console.log('Carregando foto para usuário:', userId)
-      
       const token = localStorage.getItem('auth_token')
       const response = await fetch(`http://localhost:8080/api/usuarios/${userId}/foto`, {
         method: 'GET',
@@ -74,41 +72,16 @@ export default function ProfilePage() {
           'Authorization': `Bearer ${token}`
         }
       })
-      
-      console.log('Status da resposta GET foto:', response.status)
-      
       if (response.ok) {
-        const contentType = response.headers.get('content-type')
-        console.log('Content-Type da resposta:', contentType)
-        
-        if (contentType && contentType.startsWith('image/')) {
-          // Se retorna imagem diretamente
-          const photoBlob = await response.blob()
-          const photoUrl = URL.createObjectURL(photoBlob)
-          setPreviewImage(photoUrl)
-        } else {
-          // Se retorna JSON com URL da imagem
-          const data = await response.json()
-          console.log('Dados da foto recebidos:', data)
-          
-          if (data && (data.url || data.fotoUrl || data.path)) {
-            const imageUrl = data.url || data.fotoUrl || data.path
-            setPreviewImage(imageUrl.startsWith('http') ? imageUrl : `http://localhost:8080${imageUrl}`)
-          } else {
-            setPreviewImage(null)
-          }
-        }
+        const photoPath = await response.text()
+        const fullPhotoUrl = `http://localhost:8080${photoPath}`
+        setPreviewImage(fullPhotoUrl)
       } else if (response.status === 404) {
-        console.log('Usuário não possui foto')
         setPreviewImage(null)
       } else {
-        console.log('Erro ao carregar foto - Status:', response.status)
-        const errorText = await response.text()
-        console.log('Erro:', errorText)
         setPreviewImage(null)
       }
     } catch (error) {
-      console.log('Erro ao carregar foto do usuário:', error)
       setPreviewImage(null)
     } finally {
       setIsLoadingImage(false)
@@ -151,36 +124,27 @@ export default function ProfilePage() {
         throw new Error(`Erro ${updateResponse.status}: ${errorData}`);
       }
   
-      // Atualizar foto se existir
       if (selectedFile) {
-        const formData = new FormData();
-        formData.append('foto', selectedFile);
+        const formData = new FormData()
+        formData.append('foto', selectedFile)
         
         const photoResponse = await fetch(`http://localhost:8080/api/usuarios/${user.userId}/foto`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`
-            // Não inclua Content-Type quando usar FormData, o browser define automaticamente
-            // com o boundary correto
           },
           body: formData
-        });
+        })
         
-        if (!photoResponse.ok) {
-          const errorData = await photoResponse.text();
-          throw new Error(`Erro ao atualizar foto: ${photoResponse.status} - ${errorData}`);
+        console.log('Resposta da foto do usuário:', photoResponse)
+
+        
+        if (photoResponse.ok) {
+          const photoPath = await photoResponse.text()
+          const fotoUrl = `http://localhost:8080${photoPath}`
+          setPreviewImage(fotoUrl)
         }
-  
-        const usuario = await photoResponse.json();
-        if (usuario.fotoUrl) {
-          const fotoUrl = usuario.fotoUrl.startsWith('http') 
-            ? usuario.fotoUrl 
-            : `http://localhost:8080${usuario.fotoUrl}`;
-          setPreviewImage(`${fotoUrl}?t=${new Date().getTime()}`);
-        }
-      }
-      
-      // Atualizar localStorage
+      }      
       const updatedUser = { ...user, nome: name, email };
       localStorage.setItem("user_data", JSON.stringify(updatedUser));
       setUser(updatedUser);
@@ -220,7 +184,6 @@ export default function ProfilePage() {
     try {
       const token = localStorage.getItem('auth_token')
       
-      // PATCH /{id}/senha - Alterar senha do usuário
       const response = await fetch(`http://localhost:8080/api/usuarios/${user.userId}/senha`, {
         method: 'PATCH',
         headers: {
@@ -307,7 +270,13 @@ export default function ProfilePage() {
                       </div>
                     ) : (
                       <>
-                        <AvatarImage src={previewImage || "/default-avatar.png"} />
+                        <AvatarImage 
+                          src={previewImage || `/default-avatar.png`} 
+                          alt={user?.nome}
+                          onError={(e) => {
+                            e.target.src = '/default-avatar.png'
+                          }}
+                        />
                         <AvatarFallback className="text-3xl">{user?.nome?.charAt(0) || "U"}</AvatarFallback>
                       </>
                     )}

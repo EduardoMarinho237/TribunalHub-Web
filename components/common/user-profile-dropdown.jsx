@@ -43,21 +43,12 @@ export default function UserProfileDropdown() {
                     'Authorization': `Bearer ${authToken}`
                   }
                 })
-                if (fotoResponse.ok) {
-                  const fotoData = await fotoResponse.json()
-                  const photoPath = fotoData.url || fotoData.fotoUrl || fotoData.path
-                  if (photoPath) {
-                    fotoUrl = photoPath.startsWith('http') 
-                      ? photoPath 
-                      : `http://localhost:8080${photoPath}`
+                  if (fotoResponse.ok) {
+                    const photoPath = await fotoResponse.text() // Lê o caminho como texto
+                    fotoUrl = `http://localhost:8080${photoPath}`
                   }
-                }
-              } catch (fotoError) {
-                console.log('Erro ao buscar foto:', fotoError)
-              }
+              } catch (fotoError) {}
             }
-            
-            console.log('URL da foto final:', fotoUrl)
             
             setUser({
               ...parsedUser,
@@ -66,7 +57,6 @@ export default function UserProfileDropdown() {
           }
         }
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error)
       } finally {
         setLoading(false)
       }
