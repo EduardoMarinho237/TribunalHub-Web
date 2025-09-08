@@ -56,13 +56,13 @@ export default function EditClientPage() {
           name: clientData.nome || "",
           email: clientData.email || "",
           phone: clientData.telefone || "",
-          notes: "", // A API não retorna notes, então deixamos vazio
-          status: "Ativo" // Definimos como padrão, já que a API não retorna status
+          notes: "",
+          status: "Ativo"
         })
       } catch (error) {
-        console.error("Erro ao carregar cliente:", error)
-        setError("Não foi possível carregar os dados do cliente")
-        toast.error('Erro ao carregar dados do cliente')
+        toast.error('Você não tem acesso a esse cliente ou ele não existe.')
+        router.push('/')
+
       } finally {
         setIsLoading(false)
       }

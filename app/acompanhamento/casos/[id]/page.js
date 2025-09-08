@@ -106,7 +106,6 @@ export default function ClientCasesPage() {
         
         setCases(filteredCases.length > 0 ? filteredCases : mockCasesData)
       } catch (error) {
-        console.error("Erro ao carregar casos:", error)
         setCases(mockCasesData) // Fallback para dados mockados
       } finally {
         setLoading(false)
@@ -121,7 +120,6 @@ export default function ClientCasesPage() {
   }
 
   const handleDownloadPDF = (caseId) => {
-    console.log(`Gerando PDF para o caso ${caseId}`)
     // Implementação real:
     // 1. Busca os dados do caso específico
     // 2. Gera o PDF com biblioteca como react-pdf

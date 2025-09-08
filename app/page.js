@@ -22,14 +22,9 @@ export default function Home() {
     }
     
     try {
-      console.log("Dados do usuário no localStorage:", userData)
       const parsedUser = JSON.parse(userData)
-      console.log("Usuário parseado:", parsedUser)
       setUser(parsedUser)
     } catch (error) {
-      console.error("Erro ao parsear dados do usuário:", error)
-      console.error("Conteúdo que causou erro:", userData)
-      // Limpar dados corrompidos
       localStorage.removeItem('auth_token')
       localStorage.removeItem('user_data')
       router.push("/login")

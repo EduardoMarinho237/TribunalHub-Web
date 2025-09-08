@@ -53,7 +53,6 @@ export default function EditCasePage() {
           clientName: mockCaseData.clientName
         })
       } catch (error) {
-        console.error("Erro ao carregar caso:", error)
       } finally {
         setIsLoading(false)
       }
@@ -66,10 +65,8 @@ export default function EditCasePage() {
     setIsSaving(true)
     try {
       await new Promise(resolve => setTimeout(resolve, 1000))
-      console.log("Dados atualizados:", formData)
       router.push(`/`)
     } catch (error) {
-      console.error("Erro ao atualizar caso:", error)
     } finally {
       setIsSaving(false)
     }

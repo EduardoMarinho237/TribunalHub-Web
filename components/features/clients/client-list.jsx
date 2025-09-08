@@ -98,7 +98,6 @@ export default function ClientList() {
 
       setClients(formattedClients)
     } catch (error) {
-      console.error('Error:', error)
       toast.error('Erro ao carregar lista de clientes')
     } finally {
       setLoading(false)
@@ -123,7 +122,6 @@ export default function ClientList() {
       toast.success('Cliente removido com sucesso!')
       loadClients()
     } catch (error) {
-      console.error("Erro ao excluir cliente:", error)
       toast.error('Erro ao remover cliente')
     } finally {
       setIsDeleteDialogOpen(false)
@@ -546,7 +544,7 @@ export default function ClientList() {
               variant="secondary"
               onClick={() => {
                 setIsViewModalOpen(false)
-                router.push(`/clientes/editar`)
+                router.push(`/clientes/editar/`+selectedUser?.id)
               }}
             >
               Editar informações
