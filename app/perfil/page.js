@@ -133,16 +133,15 @@ export default function ProfilePage() {
           headers: {
             'Authorization': `Bearer ${token}`
           },
-          body: formData
+          body: formData,
+          cache: 'no-store' // Evita cache da requisição
         })
         
         console.log('Resposta da foto do usuário:', photoResponse)
 
-        
         if (photoResponse.ok) {
-          const photoPath = await photoResponse.text()
-          const fotoUrl = `http://localhost:8080${photoPath}`
-          setPreviewImage(fotoUrl)
+          // Força o recarregamento da imagem do servidor adicionando um timestamp
+          await loadUserPhoto(user.userId)
         }
       }      
       const updatedUser = { ...user, nome: name, email };
