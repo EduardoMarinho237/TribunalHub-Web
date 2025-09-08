@@ -129,7 +129,7 @@ export default function ProfilePage() {
         formData.append('foto', selectedFile)
         
         const photoResponse = await fetch(`http://localhost:8080/api/usuarios/${user.userId}/foto`, {
-          method: 'PATCH',
+          method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`
           },
@@ -185,7 +185,7 @@ export default function ProfilePage() {
       const token = localStorage.getItem('auth_token')
       
       const response = await fetch(`http://localhost:8080/api/usuarios/${user.userId}/senha`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
