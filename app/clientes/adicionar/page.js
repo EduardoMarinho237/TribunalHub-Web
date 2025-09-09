@@ -75,6 +75,7 @@ export default function AddClientPage() {
 
     setIsSaving(true)
     const token = localStorage.getItem('auth_token')
+    console.log(name, email, phone)
 
     try {
       const response = await fetch('http://localhost:8080/api/clientes/register', {
@@ -83,16 +84,15 @@ export default function AddClientPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
+
         body: JSON.stringify({
           nome: name.trim(),
           email: email.trim(),
           telefone: phone.trim(),
-          visivel: true,
-          acompanhamento: false,
           usuario: {
             id: userData.userId
           }
-        })
+        }),
       })
 
       if (!response.ok) {

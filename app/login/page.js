@@ -46,25 +46,21 @@ export default function LoginPage() {
         })
       })
 
-      const responseData = await response.json()
-      console.log('Resposta completa da API:', responseData)
-      
+      const responseData = await response.json()      
       if (response.ok && responseData.token) {
         // Verificar se os dados básicos estão presentes (mais flexível)
-        const userId = responseData.id || responseData.userId
-        const nome = responseData.nome || responseData.name
+        const userId = responseData.userId
+        const nome = responseData.nome
         const email = responseData.email
-        const cargo = responseData.cargo || responseData.role
+        const cargo = responseData.cargo
         
         if (!userId || !nome || !email) {
           console.error('Dados faltando:', { userId, nome, email, cargo })
           throw new Error("Dados essenciais do usuário não encontrados na resposta da API")
         }
 
-        // Armazenar token e dados do usuário
         localStorage.setItem('auth_token', responseData.token)
         
-        // Buscar URL da foto do usuário
         let fotoUrl = null
         try {
           const fotoResponse = await fetch(`http://localhost:8080/api/usuarios/${userId}/foto`, {

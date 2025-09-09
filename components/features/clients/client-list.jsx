@@ -13,7 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
-import { Check, MoreVertical, ArrowUp, ArrowDown, Eye, Pencil, User, FileText, Calendar, Phone, Mail, ChevronDown } from "lucide-react"
+import { Check, MoreVertical, ArrowUp, ArrowDown, Eye, Pencil, User, FileText, Calendar, Phone, Mail, ChevronDown, Trash2, Lock, Unlock } from "lucide-react"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -30,7 +32,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export default function ClientList() {
@@ -48,6 +49,7 @@ export default function ClientList() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
   const [clientToDelete, setClientToDelete] = useState(null)
+  const [clientStatus, setClientStatus] = useState({})
 
   useEffect(() => {
     const checkAuthAndLoadClients = async () => {
@@ -92,10 +94,17 @@ export default function ClientList() {
         phone: client.telefone,
         registrationDate: new Date(client.dataCriacao),
         status: 'Ativo',
-        caseCount: 0,
-        notes: ''
+        caseCount: client.quantidadeCasos,
+        acompanhamento: client.acompanhamento || false
       }))
 
+      // Initialize client status based on acompanhamento field
+      const initialStatus = {}
+      formattedClients.forEach(client => {
+        initialStatus[client.id] = client.acompanhamento === false
+      })
+      setClientStatus(initialStatus)
+      
       setClients(formattedClients)
     } catch (error) {
       toast.error('Erro ao carregar lista de clientes')
@@ -193,6 +202,53 @@ export default function ClientList() {
     }
   }
 
+  const toggleClientStatus = async (clientId) => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        router.push('/login')
+        return
+      }
+
+      const newStatus = !clientStatus[clientId]
+      const client = clients.find(c => c.id === clientId)
+      
+      if (!client) {
+        throw new Error('Cliente não encontrado')
+      }
+
+      const response = await fetch(`http://localhost:8080/api/clientes/${clientId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nome: client.name,
+          email: client.email,
+          telefone: client.phone,
+          acompanhamento: !newStatus
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Erro ${response.status} ao atualizar status de acompanhamento`)
+      }
+
+      // Atualiza o estado local apenas após a confirmação da API
+      setClientStatus(prev => ({
+        ...prev,
+        [clientId]: newStatus
+      }))
+      
+      toast.success('Status de acompanhamento atualizado com sucesso!')
+    } catch (error) {
+      console.error('Erro ao atualizar status de acompanhamento:', error)
+      toast.error(error.message || 'Erro ao atualizar status de acompanhamento')
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
@@ -247,11 +303,7 @@ export default function ClientList() {
           </DropdownMenu>
           
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                {clientsPerPage} por página
-              </Button>
-            </DropdownMenuTrigger>
+
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => setClientsPerPage(2)}>2 por página</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setClientsPerPage(4)}>4 por página</DropdownMenuItem>
@@ -292,90 +344,81 @@ export default function ClientList() {
       ) : filteredClients.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
           {currentClients.map((client) => (
-            <div key={client.id} className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-lg">{client.name}</h3>
-                  <div className="flex items-center gap-1 mt-1 text-muted-foreground text-sm">
-                    <Mail size={14} className="opacity-70" />
-                    <span>{client.email}</span>
+            <Card 
+              key={client.id} 
+              className="cursor-pointer hover:shadow-lg transition-shadow duration-300"
+              onClick={() => router.push(`/casos/${client.id}`)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{client.name}</CardTitle>
+                    <CardDescription className="text-sm">{client.email}</CardDescription>
                   </div>
-                  <div className="flex items-center gap-1 mt-1 text-muted-foreground text-sm">
-                    <Phone size={14} className="opacity-70" />
-                    <span>{client.phone}</span>
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-500 hover:text-red-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setClientToDelete(client);
+                        setIsDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-500 hover:text-blue-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleClientStatus(client.id);
+                      }}
+                    >
+                      {clientStatus[client.id] ? (
+                        <Lock className="h-4 w-4" />
+                      ) : (
+                        <Unlock className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-500 hover:text-blue-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/clientes/editar/${client.id}`)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                
-                <Badge 
-                  className={`px-2 py-1 rounded-full text-xs ${
-                    client.status === "Ativo" ? "bg-green-100 text-green-800" :
-                    client.status === "Inativo" ? "bg-red-100 text-red-800" :
-                    "bg-yellow-100 text-yellow-800"
-                  }`}
-                >
-                  {client.status}
-                </Badge>
-              </div>
-              
-              <div className="flex justify-between items-center mt-4 pt-3 border-t">
-                <div className="flex gap-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar size={14} />
-                    <span>{client.registrationDate.toLocaleDateString()}</span>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center">
+                    <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span>{client.phone || 'Não informado'}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <FileText size={14} />
-                    <span>{client.caseCount} casos</span>
+                  <div className="flex items-center">
+                    <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span>Cadastrado em {client.registrationDate.toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <Badge variant={clientStatus[client.id] ? 'destructive' : 'default'}>
+                      {clientStatus[client.id] ? 'Acesso restringido' : 'Acesso liberado'}
+                    </Badge>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <FileText className="h-4 w-4 mr-1" />
+                      {client.caseCount} {client.caseCount === 1 ? 'caso' : 'casos'}
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => {
-                      setSelectedUser(client)
-                      setIsViewModalOpen(true)
-                    }}
-                    className="h-8 w-8"
-                  >
-                    <Eye size={16} />
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => router.push(`/clientes/editar/${client.id}`)}
-                    className="h-8 w-8"
-                  >
-                    <Pencil size={16} />
-                  </Button>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <MoreVertical size={16} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => router.push('/clientes/1/casos/adicionar')}>
-                        Adicionar caso
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => {
-                          setClientToDelete(client) 
-                          setIsDeleteDialogOpen(true)
-                        }}
-                        className="text-red-600 flex items-center gap-2"
-                      >
-                        <span>Excluir cliente</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : (
@@ -523,14 +566,7 @@ export default function ClientList() {
               </div>
             </div>
             
-            <div className="md:col-span-2">
-              <div className="text-sm font-medium text-muted-foreground mb-1">Anotações</div>
-              <div className="mt-1 p-3 bg-gray-50 rounded-md min-h-[100px]">
-                <p className="whitespace-pre-line">
-                  {selectedUser?.notes || 'Nenhuma anotação cadastrada'}
-                </p>
-              </div>
-            </div>
+
           </div>
 
           <div className="flex justify-end pt-4 border-t gap-2">

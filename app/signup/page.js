@@ -25,10 +25,16 @@ export default function RegisterPage() {
   useEffect(() => {
     const fetchCargos = async () => {
       try {
-        const response = await fetch("http://localhost:8080/api/usuarios/cargos")
+        const response = await fetch("http://localhost:8080/api/listar-cargos") // Ajuste o endpoint se necessário
         if (response.ok) {
           const data = await response.json()
-          const filteredCargos = data.filter(cargo => cargo !== "DESENVOLVEDOR")
+          // Filtra para remover DESENVOLVEDOR e mapeia para o formato esperado
+          const filteredCargos = data
+            .filter(cargoObj => cargoObj.codigo !== "DESENVOLVEDOR")
+            .map(cargoObj => ({
+              codigo: cargoObj.codigo,
+              descricao: cargoObj.descricao
+            }))
           setCargos(filteredCargos)
         } else {
           console.error("Erro ao buscar cargos:", response.statusText)
@@ -43,52 +49,52 @@ export default function RegisterPage() {
     fetchCargos()
   }, [])
 
-    const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
 
     if (password !== passwordConfirm) {
-        setError("As senhas não coincidem")
-        return
+      setError("As senhas não coincidem")
+      return
     }
 
     if (!cargo) {
-        setError("Por favor, selecione um cargo")
-        return
+      setError("Por favor, selecione um cargo")
+      return
     }
 
     try {
-        const res = await fetch("http://localhost:8080/api/usuarios/registrar", {
+      const res = await fetch("http://localhost:8080/api/usuarios/registrar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            nome,
-            email,
-            senha: password,
-            cargo,
+          nome,
+          email,
+          senha: password,
+          cargo,
         })
-        })
-        const text = await res.text();
-        let data;
+      })
+      
+      const text = await res.text();
+      let data;
 
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = text;
-        }
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
 
-        if (!res.ok) {
+      if (!res.ok) {
         setError(typeof data === "string" ? data : JSON.stringify(data))
         return
-        }
+      }
 
-        toast.success("Uusário registrado com sucesso!")
-        router.push("/login")
+      toast.success("Usuário registrado com sucesso!")
+      router.push("/login")
     } catch (err) {
-        setError(data || "Erro ao conectar com o servidor")
+      setError("Erro ao conectar com o servidor")
     }
-    }
-
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#ffff] to-[#9347ff]">
@@ -152,8 +158,8 @@ export default function RegisterPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {cargos.map((cargoOption) => (
-                      <SelectItem key={cargoOption} value={cargoOption}>
-                        {cargoOption}
+                      <SelectItem key={cargoOption.codigo} value={cargoOption.codigo}>
+                        {cargoOption.descricao}
                       </SelectItem>
                     ))}
                   </SelectContent>
