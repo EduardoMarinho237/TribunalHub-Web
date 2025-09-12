@@ -120,7 +120,6 @@ export default function EditClientPage() {
       // Redireciona após salvar
       router.push('/')
     } catch (error) {
-      console.error("Erro ao atualizar cliente:", error)
       setError(error.message || "Não foi possível atualizar o cliente")
       toast.error('Erro ao atualizar cliente')
     } finally {
