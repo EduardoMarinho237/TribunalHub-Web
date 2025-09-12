@@ -52,6 +52,7 @@ export default function AddClientPage() {
   const [notes, setNotes] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [userData, setUserData] = useState(null)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     // Verificar se o usuário está autenticado
@@ -103,8 +104,8 @@ export default function AddClientPage() {
       toast.success("Cliente cadastrado com sucesso!")
       router.push('/')
     } catch (error) {
-      console.error("Erro ao salvar cliente:", error)
-      toast.error(error.message || "Erro ao salvar cliente")
+      setError(error.message || "Não foi possível atualizar o cliente")
+      toast.error( "Erro ao salvar cliente")
     } finally {
       setIsSaving(false)
     }
@@ -140,6 +141,11 @@ export default function AddClientPage() {
       {/* Conteúdo */}
       <main className="flex-1 p-6 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full flex flex-col">
+          {error && (
+              <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+                {error}
+              </div>
+            )}
           <div className="bg-white p-6 rounded-lg shadow-sm border flex-1 flex flex-col">
             <div className="space-y-6 flex-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
